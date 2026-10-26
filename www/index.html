@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;background:#111;color:#fff;font-family:sans-serif;text-align:center}
+#wrap{width:80vw;max-width:360px;margin:20px auto 10px;border-radius:24px;overflow:hidden;animation:breathe 4s ease-in-out infinite}
+#face{width:100%;display:block}
+.talk #face{animation:talk .35s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(.6deg)}}
+@keyframes talk{0%,100%{transform:scale(1)}50%{transform:scale(1.015,1.03)}}
+#log{min-height:50px;padding:8px 16px;font-size:17px}
+button,input{font-size:16px;padding:10px 14px;margin:4px;border-radius:12px;border:0}
+button{background:#ff6a00;color:#fff}
+</style></head><body>
+<div id="wrap"><img id="face"></div>
+<div id="log">Riya</div>
+<button id="mic">Bolo</button><br>
+<input id="txt" placeholder="type here"><button id="send">Send</button><br>
+<input type="file" id="pic" accept="image/*">
+<script>
+const $=id=>document.getElementById(id);
+let key=localStorage.getItem("gk2");
+if(!key||key.length<20){key=prompt("Gemini API key").trim();localStorage.setItem("gk2",key)}
+const saved=localStorage.getItem("pic");if(saved)$("face").src=saved;
+$("pic").onchange=e=>{const r=new FileReader();r.onload=()=>{localStorage.setItem("pic",r.result);$("face").src=r.result};r.readAsDataURL(e.target.files[0])};
+const hist=[];
+const SYS="You are Riya, a friendly female AI assistant like Jarvis. Always reply in Hindi (Devanagari), in one or two short sentences.";
+async function ask(q){
+ hist.push({role:"user",parts:[{text:q}]});
+ const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent",{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":key},body:JSON.stringify({system_instruction:{parts:[{text:SYS}]},contents:hist})});
+ const d=await r.json();
+ if(!d.candidates)throw JSON.stringify(d.error);const c=d.candidates&&d.candidates[0];const a=c&&c.content&&c.content.parts&&c.content.parts[0].text;if(!a)throw JSON.stringify(d).slice(0,300);
+ hist.push({role:"model",parts:[{text:a}]});return a}
+function say(t){
+ const u=new SpeechSynthesisUtterance(t);u.lang="hi-IN";u.pitch=1.2;
+ const v=speechSynthesis.getVoices().find(x=>x.lang.startsWith("hi"));
+ if(v)u.voice=v;
+ u.onstart=()=>$("wrap").classList.add("talk");
+ u.onend=()=>$("wrap").classList.remove("talk");
+ speechSynthesis.speak(u)}
+async function go(q){
+ if(!q)return;$("log").textContent="...";
+ try{const a=await ask(q);$("log").textContent=a;say(a)}catch(e){$("log").textContent="Error: "+e}}
+$("send").onclick=()=>{go($("txt").value);$("txt").value=""};
+$("mic").onclick=()=>{
+ const R=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!R){$("log").textContent="mic not supported";return}
+ const s=new R();s.lang="hi-IN";s.onresult=e=>go(e.results[0][0].transcript);s.start();$("log").textContent="listening..."};
+</script></body></html>
